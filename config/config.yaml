@@ -1,0 +1,8 @@
+pollPeriod: 10s
+pollBatchSize: 50
+
+mongoURI: "mongodb://user:pass@mongodb:27017/"
+dbName: "db"
+collectionName: "articles"
+
+serverAddr: "0.0.0.0:8080"
