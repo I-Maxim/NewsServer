@@ -15,31 +15,35 @@ import (
 )
 
 type Poller struct {
-	Period time.Duration
-	Count  uint
+	period time.Duration
+	count  uint
 	repo   repo.Repository
+	client http.Client
 }
 
 func NewPoller(period time.Duration, count uint, repo repo.Repository) Poller {
 	return Poller{
-		Period: period,
-		Count:  count,
+		period: period,
+		count:  count,
 		repo:   repo,
+		client: http.Client{
+			Timeout: time.Second * 10,
+		},
 	}
 }
 
 func (p *Poller) Start(ctx context.Context) {
-	ticker := time.NewTicker(p.Period)
+	ticker := time.NewTicker(p.period)
 	defer ticker.Stop()
 
-	fetchListUrl := fmt.Sprintf("https://www.htafc.com/api/incrowd/getnewlistinformation?count=%d", p.Count)
+	fetchListUrl := fmt.Sprintf("https://www.htafc.com/api/incrowd/getnewlistinformation?count=%d", p.count)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
-			resp, err := http.Get(fetchListUrl)
+			resp, err := p.client.Get(fetchListUrl)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -61,7 +65,7 @@ func (p *Poller) Start(ctx context.Context) {
 				continue
 			}
 
-			articles := []*domain.ArticleDB{}
+			var articles []*domain.ArticleDB
 			for _, v := range list.NewsletterNewsItems.NewsletterNewsItem {
 				timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 				existing, err := p.repo.Load(timeoutCtx, v.NewsArticleID)
@@ -71,7 +75,7 @@ func (p *Poller) Start(ctx context.Context) {
 				}
 
 				url := fmt.Sprintf("https://www.htafc.com/api/incrowd/getnewsarticleinformation?id=%s", v.NewsArticleID)
-				resp, err := http.Get(url)
+				resp, err := p.client.Get(url)
 				if err != nil {
 					log.Println(err)
 					continue
