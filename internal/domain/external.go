@@ -6,7 +6,6 @@ type ClubHeader struct {
 }
 
 type ExternalArticle struct {
-	//Text              string `xml:",chardata"`
 	ArticleURL        string  `xml:"ArticleURL"`
 	NewsArticleID     string  `xml:"NewsArticleID"`
 	PublishDate       string  `xml:"PublishDate"`
@@ -23,21 +22,14 @@ type ExternalArticle struct {
 	IsPublished       string  `xml:"IsPublished"`
 }
 
-type ArticleList struct {
-	//Text               string `xml:",chardata"`
-	NewsletterNewsItem []ExternalArticle `xml:"NewsletterNewsItem"`
-}
-
 type NewsArticleInformation struct {
-	//XMLName        xml.Name `xml:"NewsArticleInformation"`
-	//Text           string   `xml:",chardata"`
 	ClubHeader
 	NewsArticle ExternalArticle `xml:"NewsArticle"`
 }
 
 type NewListInformation struct {
-	//XMLName             xml.Name `xml:"NewListInformation"`
-	//Text                string   `xml:",chardata"`
 	ClubHeader
-	NewsletterNewsItems ArticleList `xml:"NewsletterNewsItems"`
+	NewsletterNewsItems struct {
+		NewsletterNewsItem []ExternalArticle `xml:"NewsletterNewsItem"`
+	} `xml:"NewsletterNewsItems"`
 }

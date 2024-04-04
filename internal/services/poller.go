@@ -30,11 +30,12 @@ func NewPoller(period time.Duration, count uint, repo repo.Repository) Poller {
 
 func (p *Poller) Start(ctx context.Context) {
 	ticker := time.NewTicker(p.Period)
+	defer ticker.Stop()
+
 	fetchListUrl := fmt.Sprintf("https://www.htafc.com/api/incrowd/getnewlistinformation?count=%d", p.Count)
 	for {
 		select {
 		case <-ctx.Done():
-			ticker.Stop()
 			return
 
 		case <-ticker.C:
@@ -52,12 +53,15 @@ func (p *Poller) Start(ctx context.Context) {
 
 			list := domain.NewListInformation{}
 			err = xml.Unmarshal(body, &list)
+			if err := resp.Body.Close(); err != nil {
+				log.Println(err)
+			}
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 
-			articles := []*domain.Article{}
+			articles := []*domain.ArticleDB{}
 			for _, v := range list.NewsletterNewsItems.NewsletterNewsItem {
 				timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 				existing, err := p.repo.Load(timeoutCtx, v.NewsArticleID)
@@ -81,12 +85,15 @@ func (p *Poller) Start(ctx context.Context) {
 
 				extArticle := domain.NewsArticleInformation{}
 				err = xml.Unmarshal(body, &extArticle)
+				if err := resp.Body.Close(); err != nil {
+					log.Println(err)
+				}
 				if err != nil {
 					log.Println(err)
 					continue
 				}
 
-				articles = append(articles, &domain.Article{
+				articles = append(articles, &domain.ArticleDB{
 					//TeamId:      extArticle.NewsArticle.,
 					Id:          extArticle.NewsArticle.NewsArticleID,
 					OptaMatchId: extArticle.NewsArticle.OptaMatchId,
@@ -101,11 +108,15 @@ func (p *Poller) Start(ctx context.Context) {
 					Published:   extArticle.NewsArticle.PublishDate,
 				})
 			}
+			if len(articles) == 0 {
+				continue
+			}
 			timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 			if err = p.repo.Save(timeoutCtx, articles...); err != nil {
 				log.Println(err)
 			}
 			cancel()
+			log.Printf("saved %d articles\n", len(articles))
 		}
 	}
 }

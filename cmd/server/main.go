@@ -2,9 +2,8 @@ package main
 
 import (
 	"context"
-	"flag"
+	"fmt"
 	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v2"
 	"log"
 	"net/http"
 	"newsServer/internal/api"
@@ -17,28 +16,25 @@ import (
 )
 
 func main() {
-	var configPath string
-	flag.StringVar(&configPath, "config", "config/config.yaml", "path to config yaml file")
-	flag.Parse()
-
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		panic(err)
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
+}
 
-	cfg := config.Config{}
-	err = yaml.Unmarshal(configData, &cfg)
+func run() error {
+	cfg, err := config.Load()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("load config file failed: %w", err)
 	}
 
 	mongoRepo, err := repo.NewMongoRepo(cfg.MongoURI, cfg.DbName, cfg.CollectionName)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("create repository failed: %w", err)
 	}
 
 	puller := services.NewPoller(cfg.PollPeriod, cfg.PollBatchSize, mongoRepo)
-	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 	go puller.Start(ctx)
 
 	articlesApi := api.NewApi(mongoRepo)
@@ -63,7 +59,5 @@ func main() {
 			log.Println(err)
 		}
 	}()
-	if err := srv.ListenAndServe(); err != nil {
-		log.Println(err)
-	}
+	return srv.ListenAndServe()
 }
